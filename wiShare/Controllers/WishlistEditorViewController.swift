@@ -270,12 +270,3 @@ extension WishlistEditorViewController: WishlistItemEditorDelegate {
         editor.dismiss(animated: true)
     }
 }
-
-// MARK: - Control helper
-
-extension UIControl {
-    /// Closure-based target/action, so rows built in a loop stay readable.
-    func addAction(for event: UIControl.Event, handler: @escaping () -> Void) {
-        addAction(UIAction { _ in handler() }, for: event)
-    }
-}

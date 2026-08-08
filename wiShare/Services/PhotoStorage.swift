@@ -34,8 +34,8 @@ final class PhotoStorage {
     }
 
     private static func defaultDirectory() -> URL {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documents.appendingPathComponent("Photos", isDirectory: true)
+        // Shared, so the share extension writes photos the app can read.
+        SharedContainer.directory(named: "Photos")
     }
 
     // MARK: - Writing

@@ -14,13 +14,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         WishlistTheme.applyAppearance()
 
+        // Pending shares first: their photos are already on disk and must be
+        // referenced before the sweep below decides what is orphaned.
+        let store = WishlistStore.shared
+        store.applyPendingShares()
+
         // Photo files are written when picked, but the wishlist referencing them
         // is only committed on Done — cancelling leaves strays behind. Launch is
         // the one moment no editor can be holding an uncommitted file.
-        let store = WishlistStore.shared
-        DispatchQueue.global(qos: .utility).async {
-            store.pruneOrphanedPhotos()
-        }
+        store.pruneOrphanedPhotos()
 
         return true
     }

@@ -1,5 +1,12 @@
 import UIKit
 
+extension UIControl {
+    /// Closure-based target/action, so rows built in a loop stay readable.
+    func addAction(for event: UIControl.Event, handler: @escaping () -> Void) {
+        addAction(UIAction { _ in handler() }, for: event)
+    }
+}
+
 /// Rounded card that mimics an inset-grouped table section: rows stacked
 /// vertically with hairline separators inset from the leading edge.
 final class FormSectionView: UIView {

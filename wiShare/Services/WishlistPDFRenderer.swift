@@ -231,7 +231,7 @@ enum WishlistPDFRenderer {
             let linkRect = CGRect(x: Layout.textOriginX, y: cursor, width: Layout.textWidth, height: linkHeight)
             link.draw(in: linkRect)
             // Makes the text a real, tappable annotation in the PDF.
-            context.setURL(url, for: linkRect)
+            context.setURL(url, for: annotationRect(for: linkRect))
         }
     }
 
@@ -344,6 +344,25 @@ enum WishlistPDFRenderer {
     }
 
     // MARK: - Helpers
+
+    /// Converts a drawing rectangle into the one a link annotation needs.
+    ///
+    /// Everything here is laid out top-down, because `UIGraphicsPDFRenderer`
+    /// installs a flipped coordinate system for UIKit drawing. Link annotations
+    /// do not go through it: `setURL(_:for:)` forwards to
+    /// `CGPDFContextSetURLForRect`, which takes the rectangle in *default* user
+    /// space — origin at the bottom-left, current transform ignored.
+    ///
+    /// Without this flip the hot zones end up mirrored vertically, so tapping
+    /// the first item's link opens the last item's URL.
+    private static func annotationRect(for rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.minX,
+            y: Layout.page.height - rect.maxY,
+            width: rect.width,
+            height: rect.height
+        )
+    }
 
     private static func height(of text: NSAttributedString, width: CGFloat) -> CGFloat {
         let bounds = text.boundingRect(

@@ -6,19 +6,91 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D10000000000000000000014 /* wiShareShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D1000000000000000000000B /* wiShareShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D10000000000000000000016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F399B7BE3024F31300C5DEDD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1000000000000000000000A;
+			remoteInfo = wiShareShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D10000000000000000000013 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D10000000000000000000014 /* wiShareShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		D1000000000000000000000B /* wiShareShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = wiShareShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F399B7C63024F31300C5DEDD /* wiShare.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wiShare.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D10000000000000000000017 /* Exceptions for "wiShare" folder in "wiShareShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/WishlistModels.swift,
+				Services/LinkMetadataService.swift,
+				Services/PhotoStorage.swift,
+				Services/ShareInbox.swift,
+				Services/SharedContainer.swift,
+				Services/WishlistStore.swift,
+				Theme/WishlistTheme.swift,
+				Views/FormComponents.swift,
+			);
+			target = D1000000000000000000000A /* wiShareShareExtension */;
+		};
+		D10000000000000000000018 /* Exceptions for "wiShareShareExtension" folder in "wiShareShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				wiShareShareExtension.entitlements,
+			);
+			target = D1000000000000000000000A /* wiShareShareExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D1000000000000000000000C /* wiShareShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D10000000000000000000018 /* Exceptions for "wiShareShareExtension" folder in "wiShareShareExtension" target */,
+			);
+			path = wiShareShareExtension;
+			sourceTree = "<group>";
+		};
 		F399B7C83024F31300C5DEDD /* wiShare */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D10000000000000000000017 /* Exceptions for "wiShare" folder in "wiShareShareExtension" target */,
+			);
 			path = wiShare;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		D1000000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F399B7C33024F31300C5DEDD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -33,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				F399B7C83024F31300C5DEDD /* wiShare */,
+				D1000000000000000000000C /* wiShareShareExtension */,
 				F399B7C73024F31300C5DEDD /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				F399B7C63024F31300C5DEDD /* wiShare.app */,
+				D1000000000000000000000B /* wiShareShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +129,12 @@
 				F399B7C23024F31300C5DEDD /* Sources */,
 				F399B7C33024F31300C5DEDD /* Frameworks */,
 				F399B7C43024F31300C5DEDD /* Resources */,
+				D10000000000000000000013 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D10000000000000000000015 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F399B7C83024F31300C5DEDD /* wiShare */,
@@ -70,7 +146,37 @@
 			productReference = F399B7C63024F31300C5DEDD /* wiShare.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D1000000000000000000000A /* wiShareShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D10000000000000000000012 /* Build configuration list for PBXNativeTarget "wiShareShareExtension" */;
+			buildPhases = (
+				D1000000000000000000000D /* Sources */,
+				D1000000000000000000000E /* Frameworks */,
+				D1000000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D1000000000000000000000C /* wiShareShareExtension */,
+			);
+			name = wiShareShareExtension;
+			packageProductDependencies = (
+			);
+			productName = wiShareShareExtension;
+			productReference = D1000000000000000000000B /* wiShareShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		D10000000000000000000015 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1000000000000000000000A /* wiShareShareExtension */;
+			targetProxy = D10000000000000000000016 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		F399B7BE3024F31300C5DEDD /* Project object */ = {
@@ -80,6 +186,9 @@
 				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
+					D1000000000000000000000A = {
+						CreatedOnToolsVersion = 26.6;
+					};
 					F399B7C53024F31300C5DEDD = {
 						CreatedOnToolsVersion = 26.6;
 					};
@@ -100,11 +209,19 @@
 			projectRoot = "";
 			targets = (
 				F399B7C53024F31300C5DEDD /* wiShare */,
+				D1000000000000000000000A /* wiShareShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		D1000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F399B7C43024F31300C5DEDD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +232,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D1000000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F399B7C23024F31300C5DEDD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -246,6 +370,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = wiShare/wiShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8M4K7MSD8P;
@@ -290,6 +415,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = wiShare/wiShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8M4K7MSD8P;
@@ -329,6 +455,68 @@
 			};
 			name = Release;
 		};
+		D10000000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = wiShareShareExtension/wiShareShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8M4K7MSD8P;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = wiShareShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = wiShare;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = wishshare.wiShare.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D10000000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = wiShareShareExtension/wiShareShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8M4K7MSD8P;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = wiShareShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = wiShare;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = wishshare.wiShare.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -346,6 +534,15 @@
 			buildConfigurations = (
 				F399B7D23024F31500C5DEDD /* Debug */,
 				F399B7D33024F31500C5DEDD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D10000000000000000000012 /* Build configuration list for PBXNativeTarget "wiShareShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D10000000000000000000010 /* Debug */,
+				D10000000000000000000011 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

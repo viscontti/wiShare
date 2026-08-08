@@ -36,8 +36,8 @@ final class WishlistStore {
     }
 
     private static func defaultFileURL() -> URL {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documents.appendingPathComponent("wishlists.json")
+        // Shared, so the extension can read the list of wishlists to pick from.
+        SharedContainer.file(named: "wishlists.json")
     }
 
     // MARK: - Reading
@@ -75,13 +75,41 @@ final class WishlistStore {
         commit()
     }
 
+    /// Merges everything the share extension captured while the app was away.
+    /// - Returns: how many items were added.
+    @discardableResult
+    func applyPendingShares() -> Int {
+        let entries = ShareInbox.drain()
+        guard !entries.isEmpty else { return 0 }
+
+        for entry in entries {
+            if let wishlistID = entry.wishlistID,
+               let index = wishlists.firstIndex(where: { $0.id == wishlistID }) {
+                wishlists[index].items.append(entry.item)
+            } else {
+                // Either a brand new list, or the chosen one was deleted since.
+                let title = entry.newWishlistTitle ?? "Shared"
+                wishlists.insert(Wishlist(title: title, items: [entry.item]), at: 0)
+            }
+        }
+
+        commit()
+        return entries.count
+    }
+
     /// Drops photo files nothing references — run once at launch, when no
     /// editor can be holding a freshly written file that is not committed yet.
     func pruneOrphanedPhotos() {
+        // The reference set is read here, on the store's own thread; only the
+        // file scanning is handed off.
         let referenced = wishlists.reduce(into: Set<String>()) { result, wishlist in
             result.formUnion(wishlist.photoFileNames)
         }
-        photoStorage.deleteUnreferenced(keeping: referenced)
+        let storage = photoStorage
+
+        DispatchQueue.global(qos: .utility).async {
+            storage.deleteUnreferenced(keeping: referenced)
+        }
     }
 
     // MARK: - Observation

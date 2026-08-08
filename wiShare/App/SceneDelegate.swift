@@ -17,4 +17,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
         self.window = window
     }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        // Anything shared from Safari while the app was in the background.
+        WishlistStore.shared.applyPendingShares()
+    }
 }
