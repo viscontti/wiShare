@@ -10,7 +10,7 @@ final class WishlistItemSummaryView: UIControl {
     private let commentLabel = UILabel()
     private let removeButton = UIButton(type: .system)
 
-    init(item: WishlistItem) {
+    init(item: WishlistItem, photo: UIImage?) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -21,8 +21,8 @@ final class WishlistItemSummaryView: UIControl {
         thumbnailView.layer.cornerRadius = 9
         thumbnailView.layer.cornerCurve = .continuous
 
-        if let image = item.image {
-            thumbnailView.image = image
+        if let photo {
+            thumbnailView.image = photo
             thumbnailView.contentMode = .scaleAspectFill
         } else {
             thumbnailView.image = UIImage(systemName: "photo")

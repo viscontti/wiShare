@@ -1,6 +1,6 @@
-import UIKit
+import Foundation
 
-struct Wishlist: Identifiable {
+struct Wishlist: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
     var comment: String
@@ -24,24 +24,30 @@ struct Wishlist: Identifiable {
     var itemCountText: String {
         items.count == 1 ? "1 item" : "\(items.count) items"
     }
+
+    var photoFileNames: Set<String> {
+        Set(items.compactMap(\.photoFileName))
+    }
 }
 
-struct WishlistItem: Identifiable {
+struct WishlistItem: Identifiable, Codable, Equatable {
     let id: UUID
-    var image: UIImage?
+    /// File name inside `PhotoStorage`, not the image itself — keeps the model
+    /// small enough to serialise and send elsewhere.
+    var photoFileName: String?
     var title: String
     var comment: String
     var productURL: URL?
 
     init(
         id: UUID = UUID(),
-        image: UIImage? = nil,
+        photoFileName: String? = nil,
         title: String,
         comment: String = "",
         productURL: URL? = nil
     ) {
         self.id = id
-        self.image = image
+        self.photoFileName = photoFileName
         self.title = title
         self.comment = comment
         self.productURL = productURL

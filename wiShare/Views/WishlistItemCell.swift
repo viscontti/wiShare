@@ -83,9 +83,9 @@ final class WishlistItemCell: UITableViewCell {
         ])
     }
 
-    func configure(with item: WishlistItem) {
-        if let image = item.image {
-            thumbnailView.image = image
+    func configure(with item: WishlistItem, photo: UIImage?) {
+        if let photo {
+            thumbnailView.image = photo
             thumbnailView.contentMode = .scaleAspectFill
         } else {
             thumbnailView.image = UIImage(systemName: "photo")

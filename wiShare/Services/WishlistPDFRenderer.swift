@@ -39,17 +39,28 @@ enum WishlistPDFRenderer {
 
     // MARK: - Entry point
 
+    /// Resolves an item's photo file name to the full-size image.
+    typealias PhotoProvider = (String) -> UIImage?
+
+    private static let defaultPhotoProvider: PhotoProvider = { PhotoStorage.shared.image(named: $0) }
+
     /// Renders the wishlist and writes it to a temporary file ready for sharing.
     /// - Returns: the file URL of the written PDF.
-    static func writePDF(for wishlist: Wishlist) throws -> URL {
-        let data = makePDFData(for: wishlist)
+    static func writePDF(
+        for wishlist: Wishlist,
+        photoProvider: @escaping PhotoProvider = defaultPhotoProvider
+    ) throws -> URL {
+        let data = makePDFData(for: wishlist, photoProvider: photoProvider)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(fileName(for: wishlist))
         try data.write(to: url, options: .atomic)
         return url
     }
 
-    static func makePDFData(for wishlist: Wishlist) -> Data {
+    static func makePDFData(
+        for wishlist: Wishlist,
+        photoProvider: @escaping PhotoProvider = defaultPhotoProvider
+    ) -> Data {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
             kCGPDFContextTitle as String: wishlist.title,
@@ -75,7 +86,8 @@ enum WishlistPDFRenderer {
                     drawSeparator(atY: cursor - Layout.itemSpacing / 2)
                 }
 
-                draw(item: item, atY: cursor, context: context)
+                let photo = item.photoFileName.flatMap(photoProvider)
+                draw(item: item, photo: photo, atY: cursor, context: context)
                 cursor += height + Layout.itemSpacing
             }
 
@@ -183,14 +195,19 @@ enum WishlistPDFRenderer {
         return max(Layout.thumbnail, textHeight)
     }
 
-    private static func draw(item: WishlistItem, atY y: CGFloat, context: UIGraphicsPDFRendererContext) {
+    private static func draw(
+        item: WishlistItem,
+        photo: UIImage?,
+        atY y: CGFloat,
+        context: UIGraphicsPDFRendererContext
+    ) {
         let thumbnailRect = CGRect(
             x: Layout.margin,
             y: y,
             width: Layout.thumbnail,
             height: Layout.thumbnail
         )
-        drawThumbnail(for: item, in: thumbnailRect, context: context)
+        drawThumbnail(photo, in: thumbnailRect, context: context)
 
         var cursor = y
 
@@ -219,14 +236,14 @@ enum WishlistPDFRenderer {
     }
 
     private static func drawThumbnail(
-        for item: WishlistItem,
+        _ photo: UIImage?,
         in rect: CGRect,
         context: UIGraphicsPDFRendererContext
     ) {
         let cgContext = context.cgContext
         let path = UIBezierPath(roundedRect: rect, cornerRadius: 12)
 
-        guard let image = item.image else {
+        guard let image = photo else {
             Ink.accentSoft.setFill()
             path.fill()
 

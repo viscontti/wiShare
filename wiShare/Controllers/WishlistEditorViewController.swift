@@ -133,7 +133,8 @@ final class WishlistEditorViewController: UIViewController {
         }
 
         let rows: [UIView] = items.map { item in
-            let row = WishlistItemSummaryView(item: item)
+            let photo = item.photoFileName.flatMap { PhotoStorage.shared.thumbnail(named: $0) }
+            let row = WishlistItemSummaryView(item: item, photo: photo)
             row.addAction(for: .touchUpInside) { [weak self] in
                 self?.editItem(id: item.id)
             }

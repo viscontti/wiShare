@@ -3,10 +3,14 @@ import SafariServices
 
 /// Contents of one wishlist. Read-only browsing; "Edit" reopens the sheet.
 final class WishlistDetailViewController: UIViewController {
-    /// Called whenever the wishlist is edited here, so the list stays in sync.
-    var onChange: ((Wishlist) -> Void)?
+    private let wishlistID: UUID
+    private let store: WishlistStore
+    private var storeObservation: ObservationToken?
 
-    private var wishlist: Wishlist
+    /// Resolved on demand, so an edit made anywhere shows up here.
+    private var wishlist: Wishlist? {
+        store.wishlist(with: wishlistID)
+    }
 
     private lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -39,10 +43,11 @@ final class WishlistDetailViewController: UIViewController {
         action: #selector(shareWishlist)
     )
 
-    init(wishlist: Wishlist) {
-        self.wishlist = wishlist
+    init(wishlistID: UUID, store: WishlistStore = .shared) {
+        self.wishlistID = wishlistID
+        self.store = store
         super.init(nibName: nil, bundle: nil)
-        title = wishlist.title
+        title = store.wishlist(with: wishlistID)?.title
     }
 
     required init?(coder: NSCoder) { nil }
@@ -73,6 +78,10 @@ final class WishlistDetailViewController: UIViewController {
 
         tableView.tableHeaderView = headerView
         render()
+
+        storeObservation = store.observe { [weak self] in
+            self?.render()
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -97,6 +106,12 @@ final class WishlistDetailViewController: UIViewController {
     }
 
     private func render() {
+        // Deleted from the list screen while open — nothing left to show.
+        guard let wishlist else {
+            navigationController?.popViewController(animated: true)
+            return
+        }
+
         title = wishlist.title
         headerView.configure(with: wishlist)
         emptyStateView.isHidden = !wishlist.items.isEmpty
@@ -105,10 +120,13 @@ final class WishlistDetailViewController: UIViewController {
     }
 
     @objc private func shareWishlist() {
+        guard let wishlist else { return }
         WishlistShareService.share(wishlist, from: self, anchor: .barButton(shareButton))
     }
 
     @objc private func editWishlist() {
+        guard let wishlist else { return }
+
         let editor = WishlistEditorViewController(wishlist: wishlist)
         editor.delegate = self
 
@@ -135,25 +153,28 @@ final class WishlistDetailViewController: UIViewController {
 
 extension WishlistDetailViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        wishlist.items.count
+        wishlist?.items.count ?? 0
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: WishlistItemCell.reuseIdentifier, for: indexPath) as? WishlistItemCell else {
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: WishlistItemCell.reuseIdentifier, for: indexPath) as? WishlistItemCell,
+              let item = wishlist?.items[indexPath.row]
+        else {
             return UITableViewCell()
         }
-        cell.configure(with: wishlist.items[indexPath.row])
+
+        cell.configure(with: item, photo: item.photoFileName.flatMap { PhotoStorage.shared.thumbnail(named: $0) })
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard let url = wishlist.items[indexPath.row].productURL else { return }
+        guard let url = wishlist?.items[indexPath.row].productURL else { return }
         open(url)
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        wishlist.items.isEmpty ? nil : "Items"
+        (wishlist?.items.isEmpty ?? true) ? nil : "Items"
     }
 }
 
@@ -161,9 +182,8 @@ extension WishlistDetailViewController: UITableViewDataSource, UITableViewDelega
 
 extension WishlistDetailViewController: WishlistEditorDelegate {
     func wishlistEditor(_ editor: WishlistEditorViewController, didFinishWith wishlist: Wishlist, editingID: UUID?) {
-        self.wishlist = wishlist
-        render()
-        onChange?(wishlist)
+        // The store notifies back, which is what re-renders this screen.
+        store.update(wishlist)
         dismiss(animated: true)
     }
 }

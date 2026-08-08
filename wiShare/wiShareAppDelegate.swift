@@ -13,6 +13,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         WishlistTheme.applyAppearance()
+
+        // Photo files are written when picked, but the wishlist referencing them
+        // is only committed on Done — cancelling leaves strays behind. Launch is
+        // the one moment no editor can be holding an uncommitted file.
+        let store = WishlistStore.shared
+        DispatchQueue.global(qos: .utility).async {
+            store.pruneOrphanedPhotos()
+        }
+
         return true
     }
 

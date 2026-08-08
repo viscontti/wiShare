@@ -8,6 +8,12 @@ final class WishlistItemEditorViewController: UIViewController {
     private let editingID: UUID?
     private var selectedImage: UIImage?
 
+    private let photoStorage: PhotoStorage
+    /// File name the item already had. Kept so an untouched photo is reused
+    /// instead of being re-encoded and written again on every save.
+    private let existingPhotoFileName: String?
+    private var photoDidChange = false
+
     private let linkMetadataService = LinkMetadataService()
     /// Once the user picks or removes a photo by hand, link previews stop
     /// overwriting it — they can still pull one in explicitly from the menu.
@@ -25,10 +31,12 @@ final class WishlistItemEditorViewController: UIViewController {
     )
     private lazy var bottomBar = BottomActionBar(button: saveButton)
 
-    init(item: WishlistItem?) {
+    init(item: WishlistItem?, photoStorage: PhotoStorage = .shared) {
         editingID = item?.id
-        selectedImage = item?.image
-        photoChosenByUser = item?.image != nil
+        self.photoStorage = photoStorage
+        existingPhotoFileName = item?.photoFileName
+        selectedImage = item?.photoFileName.flatMap { photoStorage.thumbnail(named: $0) }
+        photoChosenByUser = item?.photoFileName != nil
         lastPreviewedURL = item?.productURL
         super.init(nibName: nil, bundle: nil)
 
@@ -162,6 +170,7 @@ final class WishlistItemEditorViewController: UIViewController {
             alert.addAction(UIAlertAction(title: "Remove Photo", style: .destructive) { [weak self] _ in
                 self?.selectedImage = nil
                 self?.photoChosenByUser = true
+                self?.photoDidChange = true
                 self?.photoRow.setImage(nil)
             })
         }
@@ -199,6 +208,7 @@ final class WishlistItemEditorViewController: UIViewController {
             }
 
             self.selectedImage = image
+            self.photoDidChange = true
             self.photoRow.setImage(image)
             if force { self.photoChosenByUser = true }
 
@@ -253,14 +263,43 @@ final class WishlistItemEditorViewController: UIViewController {
             }
         }
 
+        let photoFileName: String?
+        do {
+            photoFileName = try resolvePhotoFileName()
+        } catch {
+            presentPhotoSaveFailure()
+            return
+        }
+
         let item = WishlistItem(
             id: editingID ?? UUID(),
-            image: selectedImage,
+            photoFileName: photoFileName,
             title: trimmedTitle,
             comment: noteRow.text.trimmingCharacters(in: .whitespacesAndNewlines),
             productURL: url
         )
         delegate?.wishlistItemEditor(self, didFinishWith: item, editingID: editingID)
+    }
+
+    /// Writes a newly picked photo to disk. An untouched photo keeps its
+    /// existing file, so reopening an item never rewrites it.
+    ///
+    /// The file lands on disk before the wishlist itself is committed; if the
+    /// user cancels afterwards it is swept up by `pruneOrphanedPhotos()`.
+    private func resolvePhotoFileName() throws -> String? {
+        guard photoDidChange else { return existingPhotoFileName }
+        guard let selectedImage else { return nil }
+        return try photoStorage.save(selectedImage)
+    }
+
+    private func presentPhotoSaveFailure() {
+        let alert = UIAlertController(
+            title: "Couldn’t Save Photo",
+            message: "There may not be enough free space on your device. Try removing the photo or freeing up space.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
     /// Accepts "shop.com/item" as well as a full URL, and rejects plain text.
@@ -353,6 +392,7 @@ extension WishlistItemEditorViewController: PHPickerViewControllerDelegate {
             DispatchQueue.main.async {
                 self?.selectedImage = image
                 self?.photoChosenByUser = true
+                self?.photoDidChange = true
                 self?.photoRow.setImage(image)
             }
         }

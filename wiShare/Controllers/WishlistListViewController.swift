@@ -4,7 +4,18 @@ import UIKit
 /// Create from the `+` bar button, edit or delete from a trailing swipe or a
 /// long-press context menu.
 final class WishlistListViewController: UIViewController {
-    private var wishlists: [Wishlist] = []
+    private let store: WishlistStore
+    private var storeObservation: ObservationToken?
+    private var isApplyingLocalChange = false
+
+    private var wishlists: [Wishlist] { store.wishlists }
+
+    init(store: WishlistStore = .shared) {
+        self.store = store
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { nil }
 
     private lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -45,6 +56,13 @@ final class WishlistListViewController: UIViewController {
 
         setupLayout()
         updateEmptyState()
+
+        storeObservation = store.observe { [weak self] in
+            // A change this screen made itself is already animated in place.
+            guard let self, !self.isApplyingLocalChange else { return }
+            self.tableView.reloadData()
+            self.updateEmptyState()
+        }
     }
 
     private func setupLayout() {
@@ -105,7 +123,12 @@ final class WishlistListViewController: UIViewController {
     }
 
     private func deleteWishlist(at indexPath: IndexPath) {
-        wishlists.remove(at: indexPath.row)
+        guard indexPath.row < wishlists.count else { return }
+
+        isApplyingLocalChange = true
+        store.delete(id: wishlists[indexPath.row].id)
+        isApplyingLocalChange = false
+
         tableView.deleteRows(at: [indexPath], with: .automatic)
         updateEmptyState()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -135,12 +158,7 @@ extension WishlistListViewController: UITableViewDataSource, UITableViewDelegate
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
 
-        let detail = WishlistDetailViewController(wishlist: wishlists[indexPath.row])
-        detail.onChange = { [weak self] updated in
-            guard let self, let index = self.wishlists.firstIndex(where: { $0.id == updated.id }) else { return }
-            self.wishlists[index] = updated
-            self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
-        }
+        let detail = WishlistDetailViewController(wishlistID: wishlists[indexPath.row].id, store: store)
         navigationController?.pushViewController(detail, animated: true)
     }
 
@@ -209,14 +227,12 @@ extension WishlistListViewController: UITableViewDataSource, UITableViewDelegate
 
 extension WishlistListViewController: WishlistEditorDelegate {
     func wishlistEditor(_ editor: WishlistEditorViewController, didFinishWith wishlist: Wishlist, editingID: UUID?) {
-        if let editingID, let index = wishlists.firstIndex(where: { $0.id == editingID }) {
-            wishlists[index] = wishlist
+        // The store notifies back, which is what refreshes the table.
+        if editingID == nil {
+            store.add(wishlist)
         } else {
-            wishlists.insert(wishlist, at: 0)
+            store.update(wishlist)
         }
-
-        tableView.reloadData()
-        updateEmptyState()
         dismiss(animated: true)
     }
 }
