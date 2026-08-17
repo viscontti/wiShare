@@ -21,6 +21,7 @@ final class WishlistDetailViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(WishlistItemCell.self, forCellReuseIdentifier: WishlistItemCell.reuseIdentifier)
+        tableView.register(AddItemCell.self, forCellReuseIdentifier: AddItemCell.reuseIdentifier)
         return tableView
     }()
 
@@ -31,7 +32,7 @@ final class WishlistDetailViewController: UIViewController {
             message: "Add products with a photo, a note and a link.",
             actionTitle: "Add Item"
         )
-        view.onAction { [weak self] in self?.editWishlist() }
+        view.onAction { [weak self] in self?.addItem() }
         return view
     }()
 
@@ -42,6 +43,12 @@ final class WishlistDetailViewController: UIViewController {
         target: self,
         action: #selector(shareWishlist)
     )
+
+    private lazy var addButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addItem))
+        button.accessibilityLabel = "Add item"
+        return button
+    }()
 
     init(wishlistID: UUID, store: WishlistStore = .shared) {
         self.wishlistID = wishlistID
@@ -56,7 +63,9 @@ final class WishlistDetailViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = WishlistTheme.background
         navigationItem.largeTitleDisplayMode = .never
+        // Rightmost first: `+` lands where it sits on the list screen.
         navigationItem.rightBarButtonItems = [
+            addButton,
             UIBarButtonItem(title: "Edit", style: .plain, target: self, action: #selector(editWishlist)),
             shareButton
         ]
@@ -134,6 +143,17 @@ final class WishlistDetailViewController: UIViewController {
         navigationController.presentAsSheet(from: self)
     }
 
+    /// Straight to the item form — no detour through the wishlist editor.
+    @objc private func addItem() {
+        guard wishlist != nil else { return }
+
+        let itemEditor = WishlistItemEditorViewController(item: nil)
+        itemEditor.delegate = self
+
+        let navigationController = UINavigationController(rootViewController: itemEditor)
+        navigationController.presentAsSheet(from: self)
+    }
+
     private func open(_ url: URL) {
         guard ["http", "https"].contains(url.scheme ?? "") else {
             UIApplication.shared.open(url)
@@ -152,24 +172,40 @@ final class WishlistDetailViewController: UIViewController {
 // MARK: - Table view
 
 extension WishlistDetailViewController: UITableViewDataSource, UITableViewDelegate {
+    /// One trailing "Add Item" row after the items — but not while the list is
+    /// empty, where the empty state already offers the same action.
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        wishlist?.items.count ?? 0
+        let count = wishlist?.items.count ?? 0
+        return count == 0 ? 0 : count + 1
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: WishlistItemCell.reuseIdentifier, for: indexPath) as? WishlistItemCell,
-              let item = wishlist?.items[indexPath.row]
+        guard let items = wishlist?.items else { return UITableViewCell() }
+
+        guard indexPath.row < items.count else {
+            return tableView.dequeueReusableCell(withIdentifier: AddItemCell.reuseIdentifier, for: indexPath)
+        }
+
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: WishlistItemCell.reuseIdentifier, for: indexPath) as? WishlistItemCell
         else {
             return UITableViewCell()
         }
 
+        let item = items[indexPath.row]
         cell.configure(with: item, photo: item.photoFileName.flatMap { PhotoStorage.shared.thumbnail(named: $0) })
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard let url = wishlist?.items[indexPath.row].productURL else { return }
+        guard let items = wishlist?.items else { return }
+
+        guard indexPath.row < items.count else {
+            addItem()
+            return
+        }
+
+        guard let url = items[indexPath.row].productURL else { return }
         open(url)
     }
 
@@ -186,6 +222,61 @@ extension WishlistDetailViewController: WishlistEditorDelegate {
         store.update(wishlist)
         dismiss(animated: true)
     }
+}
+
+// MARK: - Item editor delegate
+
+extension WishlistDetailViewController: WishlistItemEditorDelegate {
+    func wishlistItemEditor(
+        _ editor: WishlistItemEditorViewController,
+        didFinishWith item: WishlistItem,
+        editingID: UUID?
+    ) {
+        // Re-read the wishlist here: it may have changed while the sheet was up.
+        guard var wishlist else {
+            editor.dismiss(animated: true)
+            return
+        }
+
+        if let editingID, let index = wishlist.items.firstIndex(where: { $0.id == editingID }) {
+            wishlist.items[index] = item
+        } else {
+            wishlist.items.append(item)
+        }
+
+        store.update(wishlist)
+        editor.dismiss(animated: true)
+    }
+}
+
+/// Trailing row of the items section: tinted "Add Item" call to action, the way
+/// Contacts closes a section with "add field".
+final class AddItemCell: UITableViewCell {
+    static let reuseIdentifier = "AddItemCell"
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+
+        backgroundColor = WishlistTheme.surface
+
+        let selectedBackground = UIView()
+        selectedBackground.backgroundColor = WishlistTheme.accentSoft
+        selectedBackgroundView = selectedBackground
+
+        var content = UIListContentConfiguration.cell()
+        content.text = "Add Item"
+        content.textProperties.color = WishlistTheme.accent
+        content.textProperties.font = .preferredFont(forTextStyle: .body)
+        content.textProperties.adjustsFontForContentSizeCategory = true
+        content.image = UIImage(systemName: "plus.circle.fill")
+        content.imageProperties.tintColor = WishlistTheme.accent
+        content.imageProperties.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .body)
+        contentConfiguration = content
+
+        accessibilityTraits.insert(.button)
+    }
+
+    required init?(coder: NSCoder) { nil }
 }
 
 /// Table header: large tinted icon, comment and an item-count chip.
