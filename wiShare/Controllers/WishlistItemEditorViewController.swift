@@ -25,6 +25,10 @@ final class WishlistItemEditorViewController: UIViewController {
     private let titleRow = FormFieldRow(placeholder: "Product name", icon: "tag")
     private let noteRow = FormNoteRow(placeholder: "Add a comment (optional)")
     private let linkRow = FormFieldRow(placeholder: "https://…", icon: "link")
+    private let priorityRow = FormSegmentedRow(
+        titles: ItemPriority.allCases.map(\.title),
+        selectedIndex: ItemPriority.medium.rawValue
+    )
     private lazy var saveButton = FormButton.makeProminent(
         title: editingID == nil ? "Add Item" : "Save",
         symbolName: editingID == nil ? "plus" : "checkmark"
@@ -44,6 +48,7 @@ final class WishlistItemEditorViewController: UIViewController {
         titleRow.textField.text = item?.title
         noteRow.text = item?.comment ?? ""
         linkRow.textField.text = item?.productURL?.absoluteString
+        priorityRow.segmentedControl.selectedSegmentIndex = (item?.priority ?? .medium).rawValue
     }
 
     required init?(coder: NSCoder) { nil }
@@ -105,6 +110,8 @@ final class WishlistItemEditorViewController: UIViewController {
         contentStack.addArrangedSubview(FormSectionView(rows: [photoRow]))
         contentStack.addArrangedSubview(FormHeaderLabel.wrapped("Details"))
         contentStack.addArrangedSubview(FormSectionView(rows: [titleRow, noteRow]))
+        contentStack.addArrangedSubview(FormHeaderLabel.wrapped("Priority"))
+        contentStack.addArrangedSubview(FormSectionView(rows: [priorityRow]))
         contentStack.addArrangedSubview(FormHeaderLabel.wrapped("Link"))
         contentStack.addArrangedSubview(FormSectionView(rows: [linkRow]))
         contentStack.addArrangedSubview(
@@ -276,7 +283,8 @@ final class WishlistItemEditorViewController: UIViewController {
             photoFileName: photoFileName,
             title: trimmedTitle,
             comment: noteRow.text.trimmingCharacters(in: .whitespacesAndNewlines),
-            productURL: url
+            productURL: url,
+            priority: ItemPriority(rawValue: priorityRow.segmentedControl.selectedSegmentIndex) ?? .medium
         )
         delegate?.wishlistItemEditor(self, didFinishWith: item, editingID: editingID)
     }

@@ -1,11 +1,42 @@
 import UIKit
 import SafariServices
 
+/// One priority group, plus the trailing section holding "Add Item".
+///
+/// `nonisolated` because the module builds with default main-actor isolation,
+/// and a diffable data source needs its identifier types to be `Sendable`.
+private nonisolated enum DetailSection: Hashable {
+    case priority(ItemPriority)
+    case add
+
+    var priority: ItemPriority? {
+        if case .priority(let priority) = self { return priority }
+        return nil
+    }
+}
+
+/// Rows are addressed by the item's id rather than by position, so an item
+/// moving between groups reads as a move and gets animated as one.
+private nonisolated enum DetailRow: Hashable {
+    case item(UUID)
+    case placeholder(ItemPriority)
+    case addItem
+
+    var itemID: UUID? {
+        if case .item(let id) = self { return id }
+        return nil
+    }
+}
+
 /// Contents of one wishlist. Read-only browsing; "Edit" reopens the sheet.
 final class WishlistDetailViewController: UIViewController {
     private let wishlistID: UUID
     private let store: WishlistStore
     private var storeObservation: ObservationToken?
+
+    /// Folded groups. Deliberately not persisted: which headers are open is
+    /// throwaway view state, not something the user owns.
+    private var collapsedPriorities: Set<ItemPriority> = []
 
     /// Resolved on demand, so an edit made anywhere shows up here.
     private var wishlist: Wishlist? {
@@ -18,12 +49,19 @@ final class WishlistDetailViewController: UIViewController {
         tableView.backgroundColor = WishlistTheme.background
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 80
-        tableView.dataSource = self
+        tableView.estimatedSectionHeaderHeight = 40
         tableView.delegate = self
         tableView.register(WishlistItemCell.self, forCellReuseIdentifier: WishlistItemCell.reuseIdentifier)
         tableView.register(AddItemCell.self, forCellReuseIdentifier: AddItemCell.reuseIdentifier)
+        tableView.register(EmptyPriorityCell.self, forCellReuseIdentifier: EmptyPriorityCell.reuseIdentifier)
+        tableView.register(
+            PrioritySectionHeaderView.self,
+            forHeaderFooterViewReuseIdentifier: PrioritySectionHeaderView.reuseIdentifier
+        )
         return tableView
     }()
+
+    private lazy var dataSource = makeDataSource()
 
     private lazy var emptyStateView: EmptyStateView = {
         let view = EmptyStateView.init(
@@ -124,8 +162,92 @@ final class WishlistDetailViewController: UIViewController {
         title = wishlist.title
         headerView.configure(with: wishlist)
         emptyStateView.isHidden = !wishlist.items.isEmpty
-        tableView.reloadData()
+
+        dataSource.apply(makeSnapshot(for: wishlist), animatingDifferences: true)
         view.setNeedsLayout()
+    }
+
+    // MARK: - Data source
+
+    private func makeDataSource() -> UITableViewDiffableDataSource<DetailSection, DetailRow> {
+        UITableViewDiffableDataSource(tableView: tableView) { [weak self] tableView, indexPath, row in
+            switch row {
+            case .item(let id):
+                let cell = tableView.dequeueReusableCell(
+                    withIdentifier: WishlistItemCell.reuseIdentifier,
+                    for: indexPath
+                )
+                guard let cell = cell as? WishlistItemCell, let item = self?.item(with: id) else { return cell }
+                cell.configure(
+                    with: item,
+                    photo: item.photoFileName.flatMap { PhotoStorage.shared.thumbnail(named: $0) }
+                )
+                return cell
+
+            case .placeholder:
+                return tableView.dequeueReusableCell(
+                    withIdentifier: EmptyPriorityCell.reuseIdentifier,
+                    for: indexPath
+                )
+
+            case .addItem:
+                return tableView.dequeueReusableCell(
+                    withIdentifier: AddItemCell.reuseIdentifier,
+                    for: indexPath
+                )
+            }
+        }
+    }
+
+    private func makeSnapshot(for wishlist: Wishlist) -> NSDiffableDataSourceSnapshot<DetailSection, DetailRow> {
+        var snapshot = NSDiffableDataSourceSnapshot<DetailSection, DetailRow>()
+
+        // An untouched wishlist shows the big empty state instead; three empty
+        // groups in a row would read as a broken screen.
+        guard !wishlist.items.isEmpty else { return snapshot }
+
+        for priority in ItemPriority.allCases {
+            snapshot.appendSections([.priority(priority)])
+            guard !collapsedPriorities.contains(priority) else { continue }
+
+            let rows = wishlist.items(with: priority).map { DetailRow.item($0.id) }
+            // All three groups stay on screen, so an unused one needs a row to
+            // say so — a bare header reads as a rendering glitch.
+            snapshot.appendItems(rows.isEmpty ? [.placeholder(priority)] : rows, toSection: .priority(priority))
+        }
+
+        snapshot.appendSections([.add])
+        snapshot.appendItems([.addItem], toSection: .add)
+
+        // Identity is the item's id, so a renamed or re-photographed item keeps
+        // the same row and has to be told to redraw itself.
+        snapshot.reconfigureItems(snapshot.itemIdentifiers.filter { $0.itemID != nil })
+        return snapshot
+    }
+
+    private func item(with id: UUID) -> WishlistItem? {
+        wishlist?.items.first { $0.id == id }
+    }
+
+    // MARK: - Priority
+
+    private func toggleCollapse(_ priority: ItemPriority) {
+        let willCollapse = !collapsedPriorities.contains(priority)
+        if willCollapse {
+            collapsedPriorities.insert(priority)
+        } else {
+            collapsedPriorities.remove(priority)
+        }
+
+        UISelectionFeedbackGenerator().selectionChanged()
+
+        // Headers live outside the snapshot, so the chevron is turned by hand.
+        if let index = dataSource.snapshot().indexOfSection(.priority(priority)),
+           let header = tableView.headerView(forSection: index) as? PrioritySectionHeaderView {
+            header.setCollapsed(willCollapse, animated: true)
+        }
+
+        render()
     }
 
     @objc private func shareWishlist() {
@@ -171,46 +293,72 @@ final class WishlistDetailViewController: UIViewController {
 
 // MARK: - Table view
 
-extension WishlistDetailViewController: UITableViewDataSource, UITableViewDelegate {
-    /// One trailing "Add Item" row after the items — but not while the list is
-    /// empty, where the empty state already offers the same action.
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        let count = wishlist?.items.count ?? 0
-        return count == 0 ? 0 : count + 1
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let items = wishlist?.items else { return UITableViewCell() }
-
-        guard indexPath.row < items.count else {
-            return tableView.dequeueReusableCell(withIdentifier: AddItemCell.reuseIdentifier, for: indexPath)
-        }
-
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: WishlistItemCell.reuseIdentifier, for: indexPath) as? WishlistItemCell
-        else {
-            return UITableViewCell()
-        }
-
-        let item = items[indexPath.row]
-        cell.configure(with: item, photo: item.photoFileName.flatMap { PhotoStorage.shared.thumbnail(named: $0) })
-        return cell
-    }
-
+extension WishlistDetailViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard let items = wishlist?.items else { return }
 
-        guard indexPath.row < items.count else {
+        switch dataSource.itemIdentifier(for: indexPath) {
+        case .addItem:
             addItem()
-            return
+        case .item(let id):
+            guard let url = item(with: id)?.productURL else { return }
+            open(url)
+        default:
+            break
         }
-
-        guard let url = items[indexPath.row].productURL else { return }
-        open(url)
     }
 
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        (wishlist?.items.isEmpty ?? true) ? nil : "Items"
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        guard let priority = dataSource.sectionIdentifier(for: section)?.priority,
+              let header = tableView.dequeueReusableHeaderFooterView(
+                withIdentifier: PrioritySectionHeaderView.reuseIdentifier
+              ) as? PrioritySectionHeaderView
+        else { return nil }
+
+        header.configure(
+            title: priority.sectionTitle,
+            count: wishlist?.items(with: priority).count ?? 0,
+            isCollapsed: collapsedPriorities.contains(priority)
+        ) { [weak self] in
+            self?.toggleCollapse(priority)
+        }
+        return header
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        // The "Add Item" section carries no header, and no gap where one was.
+        dataSource.sectionIdentifier(for: section)?.priority == nil
+            ? .leastNormalMagnitude
+            : UITableView.automaticDimension
+    }
+
+    /// Long press to move an item between priorities. Also the accessible path:
+    /// picking from a menu asks far less of the hand than any gesture would.
+    func tableView(
+        _ tableView: UITableView,
+        contextMenuConfigurationForRowAt indexPath: IndexPath,
+        point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard let id = dataSource.itemIdentifier(for: indexPath)?.itemID,
+              let item = item(with: id)
+        else { return nil }
+
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
+            let actions = ItemPriority.allCases.map { priority in
+                UIAction(
+                    title: priority.title,
+                    image: UIImage(systemName: priority.symbolName),
+                    state: item.priority == priority ? .on : .off
+                ) { _ in
+                    guard let self else { return }
+                    self.store.setPriority(priority, forItemID: id, inWishlistWithID: self.wishlistID)
+                }
+            }
+
+            return UIMenu(children: [
+                UIMenu(title: "Priority", image: UIImage(systemName: "flag"), children: actions)
+            ])
+        }
     }
 }
 
@@ -247,6 +395,119 @@ extension WishlistDetailViewController: WishlistItemEditorDelegate {
         store.update(wishlist)
         editor.dismiss(animated: true)
     }
+}
+
+/// Tappable header of a priority group: a chevron that folds it, the group's
+/// name and how many items are inside — the count is what keeps a folded group
+/// readable.
+final class PrioritySectionHeaderView: UITableViewHeaderFooterView {
+    static let reuseIdentifier = "PrioritySectionHeaderView"
+
+    private let chevronView = UIImageView(image: UIImage(systemName: "chevron.down"))
+    private let titleLabel = UILabel()
+    private let countLabel = UILabel()
+    private let button = UIButton(type: .system)
+    private var onToggle: (() -> Void)?
+
+    override init(reuseIdentifier: String?) {
+        super.init(reuseIdentifier: reuseIdentifier)
+
+        chevronView.translatesAutoresizingMaskIntoConstraints = false
+        chevronView.tintColor = .secondaryLabel
+        chevronView.contentMode = .scaleAspectFit
+        chevronView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(
+            textStyle: .caption1,
+            scale: .small
+        )
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .preferredFont(forTextStyle: .footnote)
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.textColor = .secondaryLabel
+
+        countLabel.translatesAutoresizingMaskIntoConstraints = false
+        countLabel.font = .preferredFont(forTextStyle: .footnote)
+        countLabel.adjustsFontForContentSizeCategory = true
+        countLabel.textColor = .tertiaryLabel
+
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addAction(UIAction { [weak self] _ in self?.onToggle?() }, for: .touchUpInside)
+
+        contentView.addSubview(chevronView)
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(countLabel)
+        contentView.addSubview(button)
+
+        NSLayoutConstraint.activate([
+            chevronView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            chevronView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            chevronView.widthAnchor.constraint(equalToConstant: 12),
+
+            titleLabel.leadingAnchor.constraint(equalTo: chevronView.trailingAnchor, constant: 6),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -7),
+
+            countLabel.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 6),
+            countLabel.firstBaselineAnchor.constraint(equalTo: titleLabel.firstBaselineAnchor),
+            countLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: contentView.layoutMarginsGuide.trailingAnchor
+            ),
+
+            button.topAnchor.constraint(equalTo: contentView.topAnchor),
+            button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func configure(title: String, count: Int, isCollapsed: Bool, onToggle: @escaping () -> Void) {
+        titleLabel.text = title
+        countLabel.text = "\(count)"
+        self.onToggle = onToggle
+        setCollapsed(isCollapsed, animated: false)
+
+        button.accessibilityLabel = title
+        button.accessibilityValue = count == 1 ? "1 item" : "\(count) items"
+        button.accessibilityHint = isCollapsed ? "Double tap to expand" : "Double tap to collapse"
+    }
+
+    /// Animated only when the user did the folding — a header being recycled
+    /// while scrolling must not spin its chevron.
+    func setCollapsed(_ isCollapsed: Bool, animated: Bool) {
+        let transform = isCollapsed ? CGAffineTransform(rotationAngle: -.pi / 2) : .identity
+        guard animated else {
+            chevronView.transform = transform
+            return
+        }
+        UIView.animate(withDuration: 0.25) { self.chevronView.transform = transform }
+    }
+}
+
+/// Stand-in row for a priority nobody has used yet, so an always-visible group
+/// never shows up as a header with nothing under it.
+final class EmptyPriorityCell: UITableViewCell {
+    static let reuseIdentifier = "EmptyPriorityCell"
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+
+        backgroundColor = WishlistTheme.surface
+        selectionStyle = .none
+
+        var content = UIListContentConfiguration.cell()
+        content.text = "No items"
+        content.textProperties.color = .tertiaryLabel
+        content.textProperties.font = .preferredFont(forTextStyle: .subheadline)
+        content.textProperties.adjustsFontForContentSizeCategory = true
+        content.image = UIImage(systemName: "tray")
+        content.imageProperties.tintColor = .tertiaryLabel
+        content.imageProperties.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .subheadline)
+        contentConfiguration = content
+    }
+
+    required init?(coder: NSCoder) { nil }
 }
 
 /// Trailing row of the items section: tinted "Add Item" call to action, the way
