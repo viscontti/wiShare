@@ -38,6 +38,8 @@ final class WishlistDetailViewController: UIViewController {
     /// throwaway view state, not something the user owns.
     private var collapsedPriorities: Set<ItemPriority> = []
 
+    private var renderedItems: [UUID: WishlistItem] = [:]
+
     /// Resolved on demand, so an edit made anywhere shows up here.
     private var wishlist: Wishlist? {
         store.wishlist(with: wishlistID)
@@ -48,7 +50,7 @@ final class WishlistDetailViewController: UIViewController {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = WishlistTheme.background
         tableView.rowHeight = UITableView.automaticDimension
-        tableView.estimatedRowHeight = 80
+        tableView.estimatedRowHeight = UITableView.automaticDimension
         tableView.estimatedSectionHeaderHeight = 40
         tableView.delegate = self
         tableView.register(WishlistItemCell.self, forCellReuseIdentifier: WishlistItemCell.reuseIdentifier)
@@ -170,7 +172,7 @@ final class WishlistDetailViewController: UIViewController {
     // MARK: - Data source
 
     private func makeDataSource() -> UITableViewDiffableDataSource<DetailSection, DetailRow> {
-        UITableViewDiffableDataSource(tableView: tableView) { [weak self] tableView, indexPath, row in
+        let source = UITableViewDiffableDataSource<DetailSection, DetailRow>(tableView: tableView) { [weak self] tableView, indexPath, row in
             switch row {
             case .item(let id):
                 let cell = tableView.dequeueReusableCell(
@@ -197,6 +199,8 @@ final class WishlistDetailViewController: UIViewController {
                 )
             }
         }
+        source.defaultRowAnimation = .fade
+        return source
     }
 
     private func makeSnapshot(for wishlist: Wishlist) -> NSDiffableDataSourceSnapshot<DetailSection, DetailRow> {
@@ -219,9 +223,16 @@ final class WishlistDetailViewController: UIViewController {
         snapshot.appendSections([.add])
         snapshot.appendItems([.addItem], toSection: .add)
 
-        // Identity is the item's id, so a renamed or re-photographed item keeps
-        // the same row and has to be told to redraw itself.
-        snapshot.reconfigureItems(snapshot.itemIdentifiers.filter { $0.itemID != nil })
+        let onScreen = Set(dataSource.snapshot().itemIdentifiers)
+        let changed = snapshot.itemIdentifiers.filter { row in
+            guard let id = row.itemID, onScreen.contains(row) else { return false }
+            return renderedItems[id] != item(with: id)
+        }
+        if !changed.isEmpty {
+            snapshot.reconfigureItems(changed)
+        }
+
+        renderedItems = Dictionary(uniqueKeysWithValues: wishlist.items.map { ($0.id, $0) })
         return snapshot
     }
 
