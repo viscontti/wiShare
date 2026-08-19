@@ -25,6 +25,12 @@ final class ShareItemViewController: UIViewController {
     private let noteRow = FormNoteRow(placeholder: "Add a comment (optional)")
     private let linkRow = ShareLinkRow()
     private let newListRow = FormFieldRow(placeholder: "New wishlist name", icon: "plus.circle")
+    /// Anything caught from Safari starts as medium; the app is where it gets
+    /// nudged up or down later.
+    private let priorityRow = FormSegmentedRow(
+        titles: ItemPriority.allCases.map(\.title),
+        selectedIndex: ItemPriority.medium.rawValue
+    )
     private let pickerSection = FormSectionView(rows: [])
     private lazy var addButton = FormButton.makeProminent(title: "Add to Wishlist", symbolName: "plus")
     private lazy var bottomBar = BottomActionBar(button: addButton)
@@ -82,6 +88,8 @@ final class ShareItemViewController: UIViewController {
         contentStack.addArrangedSubview(pickerSection)
         contentStack.addArrangedSubview(newListRow)
         contentStack.setCustomSpacing(12, after: pickerSection)
+        contentStack.addArrangedSubview(FormHeaderLabel.wrapped("Priority"))
+        contentStack.addArrangedSubview(FormSectionView(rows: [priorityRow]))
 
         newListRow.backgroundColor = WishlistTheme.surface
         newListRow.layer.cornerRadius = WishlistTheme.Metrics.corner
@@ -253,7 +261,8 @@ final class ShareItemViewController: UIViewController {
             photoFileName: photoFileName,
             title: trimmedTitle,
             comment: noteRow.text.trimmingCharacters(in: .whitespacesAndNewlines),
-            productURL: sharedURL
+            productURL: sharedURL,
+            priority: ItemPriority(rawValue: priorityRow.segmentedControl.selectedSegmentIndex) ?? .medium
         )
         let entry = ShareInboxEntry(
             wishlistID: selectedWishlistID,

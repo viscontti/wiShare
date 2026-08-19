@@ -67,6 +67,22 @@ final class WishlistStore {
         commit()
     }
 
+    /// Moves an item into another priority, placing it at the end of that
+    /// group — the caller never says *where* in the group, only *which*.
+    func setPriority(_ priority: ItemPriority, forItemID itemID: UUID, inWishlistWithID wishlistID: UUID) {
+        guard let listIndex = wishlists.firstIndex(where: { $0.id == wishlistID }),
+              let itemIndex = wishlists[listIndex].items.firstIndex(where: { $0.id == itemID }),
+              wishlists[listIndex].items[itemIndex].priority != priority
+        else { return }
+
+        var item = wishlists[listIndex].items.remove(at: itemIndex)
+        item.priority = priority
+        // Appending puts it last overall; the regroup in `commit` then pulls it
+        // back to the end of its own group.
+        wishlists[listIndex].items.append(item)
+        commit()
+    }
+
     func delete(id: UUID) {
         guard let index = wishlists.firstIndex(where: { $0.id == id }) else { return }
 
@@ -125,8 +141,29 @@ final class WishlistStore {
     // MARK: - Persistence
 
     private func commit() {
+        regroupItemsByPriority()
         save()
         observers.values.forEach { $0() }
+    }
+
+    /// Restores the one rule everything else leans on: every wishlist's items
+    /// are laid out high → medium → low, keeping their relative order inside a
+    /// group. A table section is then a contiguous slice of the array, and the
+    /// PDF only has to watch for the priority changing as it walks it.
+    ///
+    /// Enforced here rather than at each call site, so it also holds for items
+    /// arriving from the share extension and for lists saved before priorities
+    /// existed.
+    private func regroupItemsByPriority() {
+        for index in wishlists.indices {
+            let items = wishlists[index].items
+            let grouped = ItemPriority.allCases.flatMap { priority in
+                items.filter { $0.priority == priority }
+            }
+
+            guard grouped != items else { continue }
+            wishlists[index].items = grouped
+        }
     }
 
     private func save() {
@@ -141,5 +178,8 @@ final class WishlistStore {
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
         wishlists = (try? JSONDecoder().decode([Wishlist].self, from: data)) ?? []
+        // Lists written before priorities existed are ungrouped on disk; group
+        // them in memory so readers see the invariant even before a first save.
+        regroupItemsByPriority()
     }
 }

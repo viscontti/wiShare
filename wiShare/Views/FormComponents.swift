@@ -296,6 +296,37 @@ final class FormActionRow: UIControl {
     }
 }
 
+/// Row holding a segmented control, for a small fixed set of choices.
+///
+/// The control animates its own selection, so switching priority needs no
+/// animation code of its own.
+final class FormSegmentedRow: UIView {
+    let segmentedControl: UISegmentedControl
+
+    init(titles: [String], selectedIndex: Int) {
+        segmentedControl = UISegmentedControl(items: titles)
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        segmentedControl.selectedSegmentIndex = selectedIndex
+        segmentedControl.selectedSegmentTintColor = WishlistTheme.accent
+        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.label], for: .normal)
+        addSubview(segmentedControl)
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+
+            segmentedControl.leadingAnchor.constraint(equalTo: leadingAnchor, constant: WishlistTheme.Metrics.margin),
+            segmentedControl.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -WishlistTheme.Metrics.margin),
+            segmentedControl.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
+}
+
 enum FormKeyboardToolbar {
     /// Toolbar shown above the keyboard with a single "Done" button.
     ///

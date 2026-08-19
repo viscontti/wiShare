@@ -10,6 +10,9 @@ enum WishlistPDFRenderer {
         static let gutter: CGFloat = 16
         static let itemSpacing: CGFloat = 18
         static let footerReserve: CGFloat = 46
+        static let headingHeight: CGFloat = 20
+        /// Air above a heading that follows a previous group.
+        static let headingLead: CGFloat = 10
 
         static var contentWidth: CGFloat { page.width - margin * 2 }
         static var textWidth: CGFloat { contentWidth - thumbnail - gutter }
@@ -73,18 +76,32 @@ enum WishlistPDFRenderer {
             context.beginPage()
 
             var cursor = drawHeader(for: wishlist, context: context)
+            // Items arrive grouped by priority, so a heading is due whenever it
+            // changes. Priorities nobody used simply never come up.
+            var currentPriority: ItemPriority?
 
             for item in wishlist.items {
+                let needsHeading = item.priority != currentPriority
+                let headingHeight = needsHeading ? Layout.headingLead + Layout.headingHeight : 0
                 let height = itemHeight(for: item)
 
-                if cursor + height > Layout.page.height - Layout.footerReserve {
+                if cursor + headingHeight + height > Layout.page.height - Layout.footerReserve {
                     drawFooter(page: page, context: context)
                     context.beginPage()
                     page += 1
-                    cursor = Layout.margin
+                    // A group running over the page break repeats its heading,
+                    // so a page never opens with items belonging to nothing.
+                    cursor = drawPriorityHeading(item.priority, atY: Layout.margin)
+                } else if needsHeading {
+                    cursor = drawPriorityHeading(
+                        item.priority,
+                        atY: cursor + (cursor > Layout.margin ? Layout.headingLead : 0)
+                    )
                 } else if cursor > Layout.margin {
                     drawSeparator(atY: cursor - Layout.itemSpacing / 2)
                 }
+
+                currentPriority = item.priority
 
                 let photo = item.photoFileName.flatMap(photoProvider)
                 draw(item: item, photo: photo, atY: cursor, context: context)
@@ -181,6 +198,16 @@ enum WishlistPDFRenderer {
     }
 
     // MARK: - Items
+
+    /// Draws a group heading and returns the cursor for the first item under it.
+    private static func drawPriorityHeading(_ priority: ItemPriority, atY y: CGFloat) -> CGFloat {
+        let heading = NSAttributedString(
+            string: priority.sectionTitle,
+            attributes: [.font: Font.subtitle, .foregroundColor: Ink.accent, .kern: 0.6]
+        )
+        heading.draw(in: CGRect(x: Layout.margin, y: y, width: Layout.contentWidth, height: Layout.headingHeight))
+        return y + Layout.headingHeight
+    }
 
     private static func itemHeight(for item: WishlistItem) -> CGFloat {
         var textHeight = height(of: attributedTitle(for: item), width: Layout.textWidth)
